@@ -1,0 +1,116 @@
+# -----------------------
+# Python
+# -----------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# -----------------------
+# Jupyter
+# -----------------------
+.ipynb_checkpoints/
+
+# -----------------------
+# Environment variables
+# -----------------------
+.env
+.env.*
+
+# -----------------------
+# IDE
+# -----------------------
+.vscode/
+.idea/
+
+# -----------------------
+# macOS
+# -----------------------
+.DS_Store
+
+# -----------------------
+# Colab
+# -----------------------
+sample_data/
+
+# -----------------------
+# Python cache
+# -----------------------
+.pytest_cache/
+.mypy_cache/
+.cache/
+
+# -----------------------
+# Logs
+# -----------------------
+*.log
+logs/
+
+# -----------------------
+# Training outputs
+# -----------------------
+runs/
+outputs/
+checkpoints/
+wandb/
+mlruns/
+
+# -----------------------
+# Hugging Face model artifacts
+# -----------------------
+*.safetensors
+*.bin
+*.pt
+*.pth
+training_args.bin
+optimizer.pt
+scheduler.pt
+trainer_state.json
+rng_state.pth
+
+# -----------------------
+# Tokenizer files
+# (downloaded automatically)
+# -----------------------
+tokenizer.json
+tokenizer_config.json
+special_tokens_map.json
+vocab.json
+merges.txt
+config.json
+
+# -----------------------
+# Predictions
+# -----------------------
+predictions.json
+predictions.csv
+metrics.json
+
+# -----------------------
+# Archives
+# -----------------------
+*.zip
+*.tar
+*.gz
+
+# -----------------------
+# Node
+# -----------------------
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/dist/
+
+# -----------------------
+# FastAPI
+# -----------------------
+backend/__pycache__/
+
+# -----------------------
+# Hugging Face cache
+# -----------------------
+.huggingface/
