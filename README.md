@@ -1,140 +1,141 @@
 # InboxIQ
 
-> AI-powered email intent classification and routing for customer support.
+InboxIQ is a production-style MVP for AI-assisted customer support triage. It connects to one Gmail inbox, polls for new emails, classifies each message with a locally loaded DistilRoBERTa model, enriches the prediction with business routing rules, stores the results, and presents the queue in a React dashboard.
 
-InboxIQ is an end-to-end NLP application that automatically classifies incoming customer support emails into business intents using a fine-tuned DistilRoBERTa model.
+This is not an LLM app. The intelligence layer is a small, already-trained Hugging Face classifier running in-process inside the FastAPI backend.
 
-The project includes dataset generation, transformer fine-tuning, model evaluation, and a production-ready inference pipeline. The long-term goal is to provide an intelligent email triage system that integrates with Gmail and automatically routes emails to the appropriate support team.
+## What It Does
 
----
-
-## Features
-
-- Fine-tuned DistilRoBERTa email intent classifier
-- Synthetic customer support email dataset generation
-- Hugging Face Datasets integration
-- Hugging Face Model Hub integration
-- End-to-end training pipeline
-- Model evaluation and benchmarking
-- FastAPI inference API _(coming soon)_
-- Gmail integration _(coming soon)_
-- Interactive dashboard _(coming soon)_
-
----
+- Connects a single Gmail inbox using a one-time Google OAuth flow
+- Stores the Gmail refresh token encrypted at rest
+- Polls Gmail every 25 seconds with APScheduler
+- Classifies emails locally with `transformers.pipeline(..., top_k=3)`
+- Maps intents to department, priority, and SLA from JSON config
+- Persists emails, predictions, and credentials in SQLAlchemy models
+- Exposes dashboard APIs for list, detail, stats, filtering, and pagination
+- Renders a responsive React dashboard for triage review
 
 ## Supported Intents
 
-- Login Issue
-- Billing & Refund
-- Subscription Change
-- Bug Report
-- Feature Request
-- Integration / API
-- Performance Issue
-- Security Concern
+- `login_issue`
+- `billing_refund`
+- `subscription_change`
+- `bug_report`
+- `feature_request`
+- `integration_api`
+- `performance_issue`
+- `security_concern`
 
----
+## Stack
 
-## Tech Stack
-
-- Python
-- PyTorch
-- Hugging Face Transformers
-- Hugging Face Datasets
-- Scikit-learn
-- FastAPI _(planned)_
-- React / Next.js _(planned)_
-- Google Colab
-
----
+- Backend: FastAPI, SQLAlchemy, Alembic, APScheduler, Google API Client, Transformers, PyTorch
+- Frontend: React 19, TypeScript, Vite
+- Local database: SQLite
+- Migration target: PostgreSQL by changing `DATABASE_URL`
 
 ## Project Structure
 
-```
-InboxIQ/
-│
-├── backend/          # FastAPI application
-├── frontend/         # Web dashboard
-├── training/         # Model training notebooks
-├── data/             # Dataset generation notebooks
-├── docs/             # Documentation & screenshots
-│
-├── requirements.txt
-├── README.md
-└── .gitignore
-```
-
----
-
-## Workflow
-
-```
-Customer Emails
-        │
-        ▼
-Dataset Generation
-        │
-        ▼
-Fine-tune DistilRoBERTa
-        │
-        ▼
-Publish Model
-        │
-        ▼
-FastAPI Inference API
-        │
-        ▼
-Gmail Integration
-        │
-        ▼
-Email Routing Dashboard
+```text
+backend/
+  app/
+    api/
+    config/
+    db/
+    models/
+    services/
+    main.py
+  tests/
+frontend/
+  src/
+    components/
+    pages/
+    services/
+docs/
+  ARCHITECTURE.md
 ```
 
----
+## Environment
 
-## Roadmap
+InboxIQ reads configuration from the root `.env` file.
 
-### Phase 1
+```env
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+HF_MODEL=jibinsajujoseph/email-intent-classifier
+DATABASE_URL=sqlite:///./inboxiq.db
+SECRET_KEY=...
+ENVIRONMENT=development
+```
 
-- [x] Generate synthetic customer support email dataset
-- [x] Fine-tune DistilRoBERTa
-- [x] Evaluate classifier
-- [x] Publish dataset to Hugging Face
-- [x] Publish model to Hugging Face
+The local redirect URI is configured in code as `http://localhost:8000/auth/google/callback`.
 
-### Phase 2
+## Running Locally
 
-- [ ] FastAPI backend
-- [ ] Gmail API integration
-- [ ] Real-time email classification
-- [ ] Email routing service
+Use Node `24.18.0` for the frontend in this repo. If you use `nvm`, run `nvm use` from the project root first.
 
-### Phase 3
+### Backend
 
-- [ ] Dashboard
-- [ ] Docker deployment
-- [ ] Cloud deployment
-- [ ] Authentication
-- [ ] Analytics
+1. Create or activate a Python environment.
+2. Install backend dependencies from `backend/requirements.txt`.
+3. Run Alembic migrations from `backend/`.
+4. Start the API server.
 
----
+Example:
 
-## Dataset
+```bash
+cd backend
+alembic upgrade head
+uvicorn app.main:app --reload
+```
 
-The training dataset consists of synthetic customer support emails covering eight business intents. The dataset was generated to closely resemble real customer support emails while maintaining balanced labels and high-quality annotations.
+### Frontend
 
-🤗 Dataset: https://huggingface.co/datasets/jibinsajujoseph/<dataset-name>
+1. Install dependencies in `frontend/`.
+2. Start the Vite dev server.
 
----
+Example:
 
-## Model
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-The classifier is based on **DistilRoBERTa**, fine-tuned for multi-class email intent classification.
+Optional frontend env:
 
-🤗 Model: https://huggingface.co/jibinsajujoseph/email-intent-classifier
+```env
+VITE_API_BASE_URL=http://localhost:8000
+```
 
----
+## API Surface
 
-## License
+- `GET /health`
+- `GET /auth/google/connect`
+- `GET /auth/google/callback`
+- `POST /classify`
+- `GET /emails`
+- `GET /emails/{id}`
+- `GET /stats`
 
-Apache License 2.0
+## Tests
+
+The backend includes unit tests for:
+
+- `RoutingService`
+- `ClassifierService`
+
+Run them from `backend/`:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+## Notes
+
+- SQLite WAL mode is enabled at backend startup to reduce local write contention.
+- If the Gmail refresh token becomes invalid, the credential is marked `needs_reauth` and the sync job is removed instead of crashing the app.
+- The frontend TypeScript build is valid, but Vite 8 requires Node `20.19+` or `22.12+` for full production builds.
+
+## Documentation
+
+- Architecture: `docs/ARCHITECTURE.md`

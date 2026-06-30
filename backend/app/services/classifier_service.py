@@ -1,9 +1,6 @@
 import logging
 from typing import Any
 
-from transformers import pipeline
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -21,6 +18,16 @@ LABEL_TO_INTENT: dict[str, str] = {
 SUPPORTED_INTENTS = set(LABEL_TO_INTENT.values())
 
 
+def build_text_classification_pipeline(model_name: str):
+    from transformers import pipeline
+
+    return pipeline(
+        "text-classification",
+        model=model_name,
+        top_k=3,
+    )
+
+
 class ClassifierService:
     """Wraps the Hugging Face text-classification pipeline for local inference."""
 
@@ -34,11 +41,7 @@ class ClassifierService:
             return
 
         logger.info("Loading classifier model '%s'.", self.model_name)
-        self._pipeline = pipeline(
-            "text-classification",
-            model=self.model_name,
-            top_k=3,
-        )
+        self._pipeline = build_text_classification_pipeline(self.model_name)
         logger.info("Classifier model '%s' is ready.", self.model_name)
 
     def classify(self, text: str) -> dict[str, Any]:
