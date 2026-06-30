@@ -32,7 +32,6 @@ The runtime product is not an LLM app. In production, the intelligence layer is 
 - Backend: FastAPI, SQLAlchemy, Alembic, APScheduler, Google API Client, Transformers, PyTorch
 - Frontend: React 19, TypeScript, Vite
 - Local database: SQLite
-- Migration target: PostgreSQL by changing `DATABASE_URL`
 
 ## Model Development
 
@@ -83,8 +82,6 @@ SECRET_KEY=...
 ENVIRONMENT=development
 ```
 
-The local redirect URI is configured in code as `http://localhost:8000/auth/google/callback`.
-
 ## Running Locally
 
 Use Node `24.18.0` for the frontend in this repo. If you use `nvm`, run `nvm use` from the project root first.
@@ -123,17 +120,6 @@ Optional frontend env:
 VITE_API_BASE_URL=http://localhost:8000
 ```
 
-## API Surface
-
-- `GET /health`
-- `GET /auth/google/connect`
-- `GET /auth/google/callback`
-- `POST /classify`
-- `GET /emails`
-- `GET /emails/{id}`
-- `PATCH /emails/{id}/review`
-- `GET /stats`
-
 ## Tests
 
 The backend includes unit tests for:
@@ -151,8 +137,6 @@ python -m unittest discover -s tests -v
 
 - SQLite WAL mode is enabled at backend startup to reduce local write contention.
 - If the Gmail refresh token becomes invalid, the credential is marked `needs_reauth` and the sync job is removed instead of crashing the app.
-- The synthetic-data generator and training notebooks are offline build assets; the running app only needs the published model referenced by `HF_MODEL`.
-- The frontend TypeScript build is valid, but Vite 8 requires Node `20.19+` or `22.12+` for full production builds.
 
 ## Documentation
 
