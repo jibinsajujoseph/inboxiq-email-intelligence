@@ -20,6 +20,7 @@ env/
 # -----------------------
 .env
 .env.*
+!.env.example
 
 # -----------------------
 # IDE
@@ -109,6 +110,10 @@ frontend/dist/
 # FastAPI
 # -----------------------
 backend/__pycache__/
+backend/*.db
+backend/*.db-journal
+backend/*.db-wal
+backend/*.db-shm
 
 # -----------------------
 # Hugging Face cache

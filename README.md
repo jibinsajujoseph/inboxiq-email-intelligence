@@ -1,8 +1,8 @@
 # InboxIQ
 
-InboxIQ is a production-style MVP for AI-assisted customer support triage. It connects to one Gmail inbox, polls for new emails, classifies each message with a locally loaded DistilRoBERTa model, enriches the prediction with business routing rules, stores the results, and presents the queue in a React dashboard.
+InboxIQ is an end-to-end MVP for AI-assisted customer support triage. It connects to one Gmail inbox, polls for new emails, classifies each message with a locally loaded DistilRoBERTa model, enriches the prediction with business routing rules, stores the results, and presents the queue in a React dashboard.
 
-This is not an LLM app. The intelligence layer is a small, already-trained Hugging Face classifier running in-process inside the FastAPI backend.
+The runtime product is not an LLM app. In production, the intelligence layer is a small Hugging Face classifier running in-process inside the FastAPI backend. An LLM only shows up offline in the dataset-generation notebook that was used to build the training corpus.
 
 ## What It Does
 
@@ -33,9 +33,24 @@ This is not an LLM app. The intelligence layer is a small, already-trained Huggi
 - Local database: SQLite
 - Migration target: PostgreSQL by changing `DATABASE_URL`
 
+## Model Development
+
+The classifier was trained as part of this project, and the repo keeps that workflow visible:
+
+- `data/email_intent_dataset_generator.ipynb` generates a synthetic support-email dataset across the eight supported intents. In the current notebook configuration it uses `gpt-4o-mini` to create 50 seed emails per intent, then expands them with Python augmentation into 1,000 examples per intent.
+- The generator exports `train.jsonl`, `val.jsonl`, `test.jsonl`, and `label_metadata.json` with a stratified 80/10/10 split.
+- `training/train_distilroberta_email_intent.ipynb` pulls the dataset from `jibinsajujoseph/email-intent-dataset`, fine-tunes `distilroberta-base`, compares it against a TF-IDF + logistic regression baseline, runs confidence and confusion analysis, and supports optional unseen holdout evaluation.
+- The backend serves the resulting classifier from `HF_MODEL`, which currently points to `jibinsajujoseph/email-intent-classifier`.
+
+Those notebooks are part of the project story, even though they are not required to run the app locally.
+
 ## Project Structure
 
 ```text
+data/
+  email_intent_dataset_generator.ipynb
+training/
+  train_distilroberta_email_intent.ipynb
 backend/
   app/
     api/
@@ -56,7 +71,7 @@ docs/
 
 ## Environment
 
-InboxIQ reads configuration from the root `.env` file.
+InboxIQ reads configuration from the root `.env` file. Start by copying `.env.example` to `.env` and filling in your real values.
 
 ```env
 GOOGLE_CLIENT_ID=...
@@ -134,6 +149,7 @@ python -m unittest discover -s tests -v
 
 - SQLite WAL mode is enabled at backend startup to reduce local write contention.
 - If the Gmail refresh token becomes invalid, the credential is marked `needs_reauth` and the sync job is removed instead of crashing the app.
+- The synthetic-data generator and training notebooks are offline build assets; the running app only needs the published model referenced by `HF_MODEL`.
 - The frontend TypeScript build is valid, but Vite 8 requires Node `20.19+` or `22.12+` for full production builds.
 
 ## Documentation

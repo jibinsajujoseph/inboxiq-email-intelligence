@@ -4,6 +4,8 @@
 
 InboxIQ is a single-inbox support triage system. One Gmail account is connected once through OAuth, and the backend continues syncing with the stored refresh token. Each new email is classified locally, enriched with business routing metadata, written to the database, and exposed to the frontend dashboard.
 
+The runtime path is deliberately lightweight: the backend loads a fine-tuned DistilRoBERTa classifier from Hugging Face and runs inference locally. The LLM usage in this repo lives upstream of that runtime path, inside the notebook used to generate synthetic training data.
+
 ## High-Level Flow
 
 ```text
@@ -57,6 +59,30 @@ FastAPI Backend
   ]
 }
 ```
+
+## Model Development Pipeline
+
+The model-serving path in `backend/` is backed by two notebooks that live in the repo:
+
+### `data/email_intent_dataset_generator.ipynb`
+
+- Generates a synthetic customer-support corpus for the eight supported intents
+- Uses OpenAI to create a small seed set per intent, then expands it with deterministic Python augmentation
+- Adds realistic variation such as names, companies, greetings, ticket references, forwarded-message wrappers, and occasional typos
+- Exports `train.jsonl`, `val.jsonl`, `test.jsonl`, and `label_metadata.json`
+- Uses a stratified 80/10/10 split; with the current notebook settings that yields 8,000 total examples across all intents
+
+### `training/train_distilroberta_email_intent.ipynb`
+
+- Pulls `jibinsajujoseph/email-intent-dataset` from the Hugging Face Hub
+- Fine-tunes `distilroberta-base` for 8-way intent classification
+- Evaluates with accuracy, macro-F1, and weighted-F1
+- Compares the transformer model against a TF-IDF + logistic regression baseline
+- Saves extra analysis artefacts such as confusion matrices, training curves, and per-sample prediction dumps
+- Includes an optional unseen holdout evaluation to check whether the model is learning intent signals rather than only the generator's style
+- Exports the model bundle and a production inference snippet that maps cleanly onto `ClassifierService`
+
+This means the repo contains both sides of the system: the shipped inference app and the offline workflow used to create the classifier it serves.
 
 ### `RoutingService`
 
