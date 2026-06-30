@@ -8,6 +8,8 @@ from app.api import auth, classify, emails, stats
 from app.config.settings import settings
 from app.db.session import SessionLocal, enable_sqlite_wal_mode
 from app.services.classifier_service import ClassifierService
+from app.services.confidence_service import ConfidenceService
+from app.services.dashboard_service import DashboardService
 from app.services.gmail_service import GmailService
 from app.services.routing_service import RoutingService
 from app.services.sync_service import SyncService
@@ -27,7 +29,12 @@ async def lifespan(app: FastAPI):
     classifier_service = ClassifierService(settings.HF_MODEL)
     classifier_service.load()
     routing_service = RoutingService(settings.ROUTING_CONFIG_PATH)
+    confidence_service = ConfidenceService(settings.CONFIDENCE_CONFIG_PATH)
     gmail_service = GmailService()
+    dashboard_service = DashboardService(
+        confidence_service=confidence_service,
+        routing_service=routing_service,
+    )
     scheduler = BackgroundScheduler(timezone="UTC")
 
     def stop_gmail_sync_job() -> None:
@@ -59,6 +66,8 @@ async def lifespan(app: FastAPI):
 
     app.state.classifier_service = classifier_service
     app.state.routing_service = routing_service
+    app.state.confidence_service = confidence_service
+    app.state.dashboard_service = dashboard_service
     app.state.gmail_service = gmail_service
     app.state.sync_service = sync_service
     app.state.scheduler = scheduler

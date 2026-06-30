@@ -10,10 +10,11 @@ The runtime product is not an LLM app. In production, the intelligence layer is 
 - Stores the Gmail refresh token encrypted at rest
 - Polls Gmail every 25 seconds with APScheduler
 - Classifies emails locally with `transformers.pipeline(..., top_k=3)`
+- Evaluates prediction confidence against thresholds (`confidence_config.json`) to flag emails for review
 - Maps intents to department, priority, and SLA from JSON config
-- Persists emails, predictions, and credentials in SQLAlchemy models
-- Exposes dashboard APIs for list, detail, stats, filtering, and pagination
-- Renders a responsive React dashboard for triage review
+- Persists emails, predictions, and review state in SQLAlchemy models
+- Exposes dashboard APIs for list, detail, stats, review actions, filtering, and pagination
+- Renders a responsive React dashboard with a dedicated review queue for human-in-the-loop triage
 
 ## Supported Intents
 
@@ -130,6 +131,7 @@ VITE_API_BASE_URL=http://localhost:8000
 - `POST /classify`
 - `GET /emails`
 - `GET /emails/{id}`
+- `PATCH /emails/{id}/review`
 - `GET /stats`
 
 ## Tests

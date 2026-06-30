@@ -1,30 +1,33 @@
 import { API_BASE_URL } from '@/services/api'
 
+export type PrimaryNavKey = 'inbox' | 'review'
+
 type SidebarItem = {
-  key: string
+  key: PrimaryNavKey
   label: string
   hint: string
+  count?: number
 }
 
 type SidebarProps = {
-  activeKey: string
-  items: SidebarItem[]
-  onSelect: (key: string) => void
+  activeKey: PrimaryNavKey
+  unreviewedCount: number
+  onSelect: (key: PrimaryNavKey) => void
 }
 
-export function Sidebar({ activeKey, items, onSelect }: SidebarProps) {
+export function Sidebar({ activeKey, unreviewedCount, onSelect }: SidebarProps) {
+  const items: SidebarItem[] = [
+    { key: 'inbox', label: 'Inbox', hint: 'Every routed message' },
+    { key: 'review', label: 'Needs Review', hint: 'Low confidence items', count: unreviewedCount },
+  ]
+
   return (
     <aside className="sidebar">
-      <div className="sidebar__brand">
-        <p className="sidebar__eyebrow">InboxIQ</p>
-        <h1>Support radar for one shared inbox.</h1>
-        <p className="sidebar__copy">
-          New Gmail messages flow through triage, routing, and review without
-          leaving this board.
-        </p>
+      <div className="sidebar__brand" style={{ paddingLeft: '1.05rem', marginBottom: '0.5rem' }}>
+        <p style={{ margin: 0, fontSize: '0.9rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(244, 240, 233, 0.9)' }}>InboxIQ</p>
       </div>
 
-      <nav className="sidebar__nav" aria-label="Email filters">
+      <nav className="sidebar__nav" aria-label="Primary navigation">
         {items.map((item) => {
           const isActive = item.key === activeKey
 
@@ -34,9 +37,25 @@ export function Sidebar({ activeKey, items, onSelect }: SidebarProps) {
               type="button"
               className={`sidebar__item${isActive ? ' is-active' : ''}`}
               onClick={() => onSelect(item.key)}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
             >
-              <span>{item.label}</span>
-              <small>{item.hint}</small>
+              <div>
+                <span>{item.label}</span>
+                <small style={{ display: 'block' }}>{item.hint}</small>
+              </div>
+              {item.count !== undefined && item.count > 0 ? (
+                <span
+                  style={{
+                    background: 'var(--color-background-warning)',
+                    color: 'var(--color-text-warning)',
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    fontSize: '12px',
+                  }}
+                >
+                  {item.count}
+                </span>
+              ) : null}
             </button>
           )
         })}

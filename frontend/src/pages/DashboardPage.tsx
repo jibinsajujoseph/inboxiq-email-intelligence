@@ -2,36 +2,31 @@ import { startTransition, useDeferredValue, useEffect, useState } from 'react'
 
 import { EmailDetailDrawer } from '@/components/EmailDetail/EmailDetailDrawer'
 import { EmailList } from '@/components/EmailList/EmailList'
-import { Filters } from '@/components/Filters/Filters'
-import { Sidebar } from '@/components/Sidebar/Sidebar'
+import { Filters, FilterChipItem } from '@/components/Filters/Filters'
+import { Sidebar, PrimaryNavKey } from '@/components/Sidebar/Sidebar'
 import { StatsCard } from '@/components/StatsCard/StatsCard'
 import {
   fetchEmailDetail,
   fetchEmails,
   fetchStats,
+  reviewEmail,
+  fetchAuthStatus,
+  type AuthStatus,
   type EmailDetail,
   type EmailListItem,
   type PaginationMeta,
   type StatsResponse,
 } from '@/services/api'
 
-type SidebarFilter = {
-  key: string
-  label: string
-  hint: string
-  intent?: string
-  department?: string
-}
-
-const SIDEBAR_FILTERS: SidebarFilter[] = [
-  { key: 'all', label: 'All', hint: 'Every routed message' },
-  { key: 'login', label: 'Login Issues', hint: 'Urgent access problems', intent: 'login_issue' },
-  { key: 'billing', label: 'Billing', hint: 'Refunds and plan changes', department: 'Billing' },
-  { key: 'bugs', label: 'Bug Reports', hint: 'Product defects', intent: 'bug_report' },
-  { key: 'features', label: 'Feature Requests', hint: 'Customer ideas', intent: 'feature_request' },
-  { key: 'performance', label: 'Performance', hint: 'Slowdowns and instability', intent: 'performance_issue' },
-  { key: 'security', label: 'Security', hint: 'Critical concerns', intent: 'security_concern' },
-  { key: 'developer', label: 'Developer Support', hint: 'API and integration help', department: 'Developer Support' },
+const FILTER_CHIPS: FilterChipItem[] = [
+  { key: 'all', label: 'All intents' },
+  { key: 'login', label: 'Login', intent: 'login_issue' },
+  { key: 'billing', label: 'Billing', department: 'Billing' },
+  { key: 'bugs', label: 'Bug report', intent: 'bug_report' },
+  { key: 'features', label: 'Feature request', intent: 'feature_request' },
+  { key: 'performance', label: 'Performance', intent: 'performance_issue' },
+  { key: 'security', label: 'Security', intent: 'security_concern' },
+  { key: 'developer', label: 'Dev support', department: 'Developer Support' },
 ]
 
 function formatPercent(value: number) {
@@ -39,7 +34,8 @@ function formatPercent(value: number) {
 }
 
 export function DashboardPage() {
-  const [activeFilterKey, setActiveFilterKey] = useState('all')
+  const [activePrimaryNav, setActivePrimaryNav] = useState<PrimaryNavKey>('inbox')
+  const [activeChipKey, setActiveChipKey] = useState('all')
   const [searchInput, setSearchInput] = useState('')
   const deferredSearch = useDeferredValue(searchInput)
   const [page, setPage] = useState(1)
@@ -49,6 +45,7 @@ export function DashboardPage() {
   const [stats, setStats] = useState<StatsResponse | null>(null)
   const [selectedEmailId, setSelectedEmailId] = useState<number | null>(null)
   const [selectedEmail, setSelectedEmail] = useState<EmailDetail | null>(null)
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null)
 
   const [isLoadingEmails, setIsLoadingEmails] = useState(true)
   const [isLoadingStats, setIsLoadingStats] = useState(true)
@@ -59,8 +56,7 @@ export function DashboardPage() {
   const [detailError, setDetailError] = useState<string | null>(null)
   const [refreshTick, setRefreshTick] = useState(0)
 
-  const activeFilter =
-    SIDEBAR_FILTERS.find((item) => item.key === activeFilterKey) ?? SIDEBAR_FILTERS[0]
+  const activeChip = FILTER_CHIPS.find((c) => c.key === activeChipKey) || FILTER_CHIPS[0]
 
   useEffect(() => {
     const abortController = new AbortController()
@@ -70,8 +66,9 @@ export function DashboardPage() {
 
     fetchEmails(
       {
-        intent: activeFilter.intent,
-        department: activeFilter.department,
+        intent: activeChip.intent,
+        department: activeChip.department,
+        review_status: activePrimaryNav === 'review' ? 'unreviewed' : undefined,
         search: deferredSearch.trim() || undefined,
         page,
         pageSize: 12,
@@ -86,11 +83,8 @@ export function DashboardPage() {
         if (abortController.signal.aborted) {
           return
         }
-
         setEmailError(
-          error instanceof Error
-            ? error.message
-            : 'Unable to load emails right now.',
+          error instanceof Error ? error.message : 'Unable to load emails right now.',
         )
         setEmails([])
         setPagination(null)
@@ -102,7 +96,7 @@ export function DashboardPage() {
       })
 
     return () => abortController.abort()
-  }, [activeFilter.department, activeFilter.intent, deferredSearch, page, refreshTick])
+  }, [activePrimaryNav, activeChip.department, activeChip.intent, deferredSearch, page, refreshTick])
 
   useEffect(() => {
     const abortController = new AbortController()
@@ -116,17 +110,22 @@ export function DashboardPage() {
         if (abortController.signal.aborted) {
           return
         }
-
         setStatsError(
-          error instanceof Error
-            ? error.message
-            : 'Unable to load dashboard stats right now.',
+          error instanceof Error ? error.message : 'Unable to load dashboard stats right now.',
         )
         setStats(null)
       })
       .finally(() => {
         if (!abortController.signal.aborted) {
           setIsLoadingStats(false)
+        }
+      })
+
+    fetchAuthStatus(abortController.signal)
+      .then((response) => setAuthStatus(response))
+      .catch((error: unknown) => {
+        if (!abortController.signal.aborted) {
+          console.error('Failed to fetch auth status', error)
         }
       })
 
@@ -153,11 +152,8 @@ export function DashboardPage() {
         if (abortController.signal.aborted) {
           return
         }
-
         setDetailError(
-          error instanceof Error
-            ? error.message
-            : 'Unable to load email details right now.',
+          error instanceof Error ? error.message : 'Unable to load email details right now.',
         )
       })
       .finally(() => {
@@ -169,9 +165,17 @@ export function DashboardPage() {
     return () => abortController.abort()
   }, [selectedEmailId])
 
-  function handleSidebarSelect(key: string) {
+  function handlePrimaryNavSelect(key: PrimaryNavKey) {
     startTransition(() => {
-      setActiveFilterKey(key)
+      setActivePrimaryNav(key)
+      setPage(1)
+      setSelectedEmailId(null)
+    })
+  }
+
+  function handleChipSelect(key: string) {
+    startTransition(() => {
+      setActiveChipKey(key)
       setPage(1)
       setSelectedEmailId(null)
     })
@@ -196,54 +200,86 @@ export function DashboardPage() {
     setSelectedEmailId(null)
   }
 
-  const topDepartment = stats?.by_department[0]
-  const secondDepartment = stats?.by_department[1]
+  function handleReview(emailId: number, correctedIntent?: string) {
+    reviewEmail(emailId, correctedIntent)
+      .then((updatedDetail) => {
+        // Optimistically remove from list if we are in the Needs Review queue
+        if (activePrimaryNav === 'review') {
+          setEmails((prev) => prev.filter((e) => e.id !== emailId))
+          setStats((prev) => prev ? {
+            ...prev,
+            unreviewed_count: Math.max(0, (prev as any).unreviewed_count - 1)
+          } : prev)
+          if (selectedEmailId === emailId) {
+            setSelectedEmailId(null)
+          }
+        } else {
+          // If in inbox view, update the item in place
+          setEmails((prev) => prev.map((e) => {
+            if (e.id === emailId) {
+              return {
+                ...e,
+                prediction: {
+                  ...e.prediction,
+                  reviewed: true,
+                  intent: updatedDetail.prediction?.intent ?? e.prediction.intent,
+                  department: updatedDetail.department,
+                  priority: updatedDetail.priority,
+                  confidence_tier: updatedDetail.prediction?.intent !== e.prediction.intent ? 'auto_routed' : e.prediction.confidence_tier
+                }
+              }
+            }
+            return e
+          }))
+          if (selectedEmailId === emailId) {
+            setSelectedEmail(updatedDetail)
+          }
+        }
+      })
+      .catch((error) => {
+        alert(error instanceof Error ? error.message : 'Failed to update review status')
+      })
+  }
+
+  // Define the mockup stats based on real data
+  const unreviewedCount = stats?.unreviewed_count ?? 0
+  const totalEmails = stats?.total_emails ?? 0
+  const avgConfidence = stats?.avg_confidence ?? 0
+  
+  // High priority count could theoretically be pulled from backend, but since it's not currently exposed by /stats, 
+  // we will show "Top department" as a placeholder for now, styled to match the mockup.
+  const topDepartment = stats?.by_department?.[0]
 
   return (
     <div className="dashboard-shell">
       <Sidebar
-        activeKey={activeFilter.key}
-        items={SIDEBAR_FILTERS}
-        onSelect={handleSidebarSelect}
+        activeKey={activePrimaryNav}
+        unreviewedCount={unreviewedCount}
+        onSelect={handlePrimaryNavSelect}
       />
 
       <main className="dashboard-main">
-        <section className="hero-panel">
-          <div>
-            <p className="hero-panel__eyebrow">Dashboard</p>
-            <h2>Inbox flow, intent confidence, and routing pressure in one place.</h2>
-          </div>
-          <p className="hero-panel__copy">
-            Track what the classifier is seeing, spot the queues building up,
-            and open any message for the full triage record.
-          </p>
-        </section>
-
         <Filters
           searchValue={searchInput}
-          activeLabel={activeFilter.label}
+          activeLabel={activeChip.label}
+          chips={FILTER_CHIPS}
+          activeChipKey={activeChipKey}
+          authStatus={authStatus}
           onSearchChange={handleSearchChange}
           onRefresh={handleRefresh}
+          onChipSelect={handleChipSelect}
         />
 
         {statsError ? <div className="panel-message panel-message--error">{statsError}</div> : null}
 
         <section className="stats-grid">
           <StatsCard
-            label="Total emails"
-            value={
-              isLoadingStats ? '...' : String(stats?.total_emails ?? 0)
-            }
-            tone="sun"
+            label="Needs review"
+            value={isLoadingStats ? '...' : String(unreviewedCount)}
           />
           <StatsCard
-            label="Average confidence"
-            value={
-              isLoadingStats
-                ? '...'
-                : formatPercent(stats?.avg_confidence ?? 0)
-            }
-            tone="mint"
+            label="Processed today"
+            value={isLoadingStats ? '...' : String(totalEmails)}
           />
           <StatsCard
             label="Top department"
@@ -251,21 +287,13 @@ export function DashboardPage() {
               isLoadingStats
                 ? '...'
                 : topDepartment
-                  ? `${topDepartment.label} · ${topDepartment.count}`
+                  ? `${topDepartment.label} (${topDepartment.count})`
                   : 'No data'
             }
-            tone="ink"
           />
           <StatsCard
-            label="Next busiest"
-            value={
-              isLoadingStats
-                ? '...'
-                : secondDepartment
-                  ? `${secondDepartment.label} · ${secondDepartment.count}`
-                  : 'No data'
-            }
-            tone="rose"
+            label="Avg confidence"
+            value={isLoadingStats ? '...' : formatPercent(avgConfidence)}
           />
         </section>
 
@@ -278,6 +306,7 @@ export function DashboardPage() {
             selectedEmailId={selectedEmailId}
             onSelectEmail={handleEmailSelect}
             onPageChange={setPage}
+            onReview={handleReview}
           />
 
           <EmailDetailDrawer
@@ -286,6 +315,7 @@ export function DashboardPage() {
             isOpen={selectedEmailId !== null}
             errorMessage={detailError}
             onClose={handleCloseDrawer}
+            onReview={handleReview}
           />
         </div>
       </main>

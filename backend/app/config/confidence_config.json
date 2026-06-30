@@ -1,0 +1,4 @@
+{
+  "high_confidence_threshold": 0.90,
+  "needs_review_threshold": 0.70
+}

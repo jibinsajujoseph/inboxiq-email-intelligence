@@ -4,6 +4,7 @@ export const API_BASE_URL =
 export type EmailListQuery = {
   intent?: string
   department?: string
+  review_status?: string
   search?: string
   page?: number
   pageSize?: number
@@ -17,9 +18,13 @@ export type TopPrediction = {
 export type EmailPredictionSummary = {
   intent: string | null
   confidence: number | null
+  confidence_tier: string | null
+  top3: TopPrediction[] | null
   department: string | null
   priority: string | null
   sla_minutes: number | null
+  reviewed: boolean
+  was_corrected: boolean
 }
 
 export type EmailListItem = {
@@ -72,6 +77,9 @@ export type StatsResponse = {
   avg_confidence: number
   by_intent: CountByLabel[]
   by_department: CountByLabel[]
+  unreviewed_count: number
+  needs_review_count: number
+  manual_review_count: number
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -102,6 +110,9 @@ export async function fetchEmails(
   if (query.department) {
     params.set('department', query.department)
   }
+  if (query.review_status) {
+    params.set('review_status', query.review_status)
+  }
   if (query.search) {
     params.set('search', query.search)
   }
@@ -125,4 +136,25 @@ export async function fetchEmailDetail(
 
 export async function fetchStats(signal?: AbortSignal): Promise<StatsResponse> {
   return request<StatsResponse>('/stats', { signal })
+}
+
+export async function reviewEmail(
+  emailId: number,
+  correctedIntent?: string,
+  signal?: AbortSignal,
+): Promise<EmailDetail> {
+  return request<EmailDetail>(`/emails/${emailId}/review`, {
+    method: 'PATCH',
+    body: JSON.stringify({ corrected_intent: correctedIntent || null }),
+    signal,
+  })
+}
+
+export type AuthStatus = {
+  connected: boolean
+  email: string | null
+}
+
+export async function fetchAuthStatus(signal?: AbortSignal): Promise<AuthStatus> {
+  return request<AuthStatus>('/auth/google/status', { signal })
 }

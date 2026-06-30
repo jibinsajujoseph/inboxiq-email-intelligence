@@ -119,3 +119,5 @@ backend/*.db-shm
 # Hugging Face cache
 # -----------------------
 .huggingface/
+
+for-agent/

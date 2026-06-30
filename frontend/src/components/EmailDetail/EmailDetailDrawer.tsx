@@ -1,4 +1,4 @@
-import type { EmailDetail } from '@/services/api'
+import type { EmailDetail, TopPrediction } from '@/services/api'
 
 type EmailDetailDrawerProps = {
   email: EmailDetail | null
@@ -6,13 +6,13 @@ type EmailDetailDrawerProps = {
   isOpen: boolean
   errorMessage: string | null
   onClose: () => void
+  onReview: (emailId: number, correctedIntent?: string) => void
 }
 
 function formatDateTime(value: string | null) {
   if (!value) {
     return 'Unknown time'
   }
-
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -23,105 +23,110 @@ function formatIntent(intent: string) {
   return intent.replaceAll('_', ' ')
 }
 
+function getConfidenceStyles(tier: string | null) {
+  if (tier === 'auto_routed') return { color: 'var(--color-text-success)', background: 'var(--color-background-success)' }
+  if (tier === 'needs_review') return { color: 'var(--color-text-warning)', background: 'var(--color-background-warning)' }
+  return { color: 'var(--color-text-danger)', background: 'var(--color-background-danger)' }
+}
+
 export function EmailDetailDrawer({
   email,
   isLoading,
   isOpen,
   errorMessage,
   onClose,
+  onReview
 }: EmailDetailDrawerProps) {
+  const cStyle = email ? getConfidenceStyles(email.confidence_tier) : null
+  const needsReviewAction = email && !email.reviewed && (email.confidence_tier === 'needs_review' || email.confidence_tier === 'manual_review')
+
   return (
     <div className={`drawer-shell${isOpen ? ' is-open' : ''}`} aria-hidden={!isOpen}>
-      <button
-        type="button"
-        className="drawer-shell__scrim"
-        onClick={onClose}
-        aria-label="Close email details"
-      />
-
       <aside className="drawer" aria-label="Email details">
-        <div className="drawer__header">
-          <div>
-            <p className="section-heading__eyebrow">Email detail</p>
-            <h2>{email?.subject || 'Select an email'}</h2>
-          </div>
-          <button type="button" className="drawer__close" onClick={onClose}>
-            Close
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+          <span style={{ fontSize: '15px', fontWeight: 500, color: 'var(--ink)' }}>{email?.subject || 'Select an email'}</span>
+          <button aria-label="Close detail" onClick={onClose} style={{ border: 'none', padding: '2px', width: 'auto', flexShrink: 0, background: 'transparent', cursor: 'pointer', fontSize: '16px', color: 'var(--color-text-tertiary)' }}>
+            ✕
           </button>
         </div>
 
         {isLoading ? <div className="panel-message">Loading email details...</div> : null}
         {errorMessage ? <div className="panel-message panel-message--error">{errorMessage}</div> : null}
         {!isLoading && !errorMessage && email === null ? (
-          <div className="panel-message">Choose an email from the queue to inspect its triage result.</div>
+          <div className="panel-message" style={{ fontSize: '13px' }}>Choose an email from the queue to inspect its triage result.</div>
         ) : null}
 
         {email ? (
-          <div className="drawer__content">
-            <div className="drawer__facts">
-              <div>
-                <span>Sender</span>
-                <strong>{email.sender || 'Unknown sender'}</strong>
-              </div>
-              <div>
-                <span>Department</span>
-                <strong>{email.department || 'Unassigned'}</strong>
-              </div>
-              <div>
-                <span>Priority</span>
-                <strong>{email.priority || 'Unassigned'}</strong>
-              </div>
-              <div>
-                <span>SLA</span>
-                <strong>
-                  {email.sla_minutes !== null ? `${email.sla_minutes} min` : 'Not set'}
-                </strong>
-              </div>
+          <>
+            <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: '0 0 12px' }}>
+              {email.sender || 'Unknown sender'}
+            </p>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+              {email.prediction && (
+                <span style={{ fontSize: '12px', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-md)', padding: '3px 8px' }}>
+                  {formatIntent(email.prediction.intent)}
+                </span>
+              )}
+              <span style={{ fontSize: '12px', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-md)', padding: '3px 8px' }}>
+                {email.department || 'Unassigned'}
+              </span>
+              {email.prediction && cStyle && (
+                <span style={{ fontSize: '12px', fontWeight: 500, color: cStyle.color, background: cStyle.background, padding: '3px 8px', borderRadius: 'var(--border-radius-md)' }}>
+                  {Math.round(email.prediction.confidence * 100)}%
+                </span>
+              )}
+              {email.reviewed && (
+                <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-success)', background: 'var(--color-background-success)', padding: '3px 8px', borderRadius: 'var(--border-radius-md)' }}>
+                  Reviewed
+                </span>
+              )}
             </div>
 
-            <div className="drawer__body">
-              <div className="drawer-card">
-                <p className="drawer-card__label">Body</p>
-                <pre>{email.body || 'No body was parsed for this message.'}</pre>
-              </div>
-
-              <div className="drawer-card">
-                <p className="drawer-card__label">Prediction</p>
-                {email.prediction ? (
-                  <>
-                    <div className="prediction-summary">
-                      <strong>{formatIntent(email.prediction.intent)}</strong>
-                      <span>{Math.round(email.prediction.confidence * 100)}% confidence</span>
-                    </div>
-                    <ul className="top-predictions">
-                      {email.prediction.top3.map((item) => (
-                        <li key={`${email.id}-${item.intent}`}>
-                          <span>{formatIntent(item.intent)}</span>
-                          <strong>{Math.round(item.confidence * 100)}%</strong>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                ) : (
-                  <p>No prediction has been stored yet.</p>
+            <table style={{ width: '100%', fontSize: '13px', marginBottom: '12px' }}>
+              <tbody>
+                <tr>
+                  <td style={{ color: 'var(--color-text-secondary)', padding: '3px 0' }}>Priority</td>
+                  <td style={{ textAlign: 'right' }}>{email.priority || 'Not set'}</td>
+                </tr>
+                <tr>
+                  <td style={{ color: 'var(--color-text-secondary)', padding: '3px 0' }}>SLA</td>
+                  <td style={{ textAlign: 'right' }}>{email.sla_minutes !== null ? `${email.sla_minutes} min` : 'Not set'}</td>
+                </tr>
+                {email.was_corrected && email.original_intent && (
+                  <tr>
+                    <td style={{ color: 'var(--color-text-secondary)', padding: '3px 0' }}>Original Intent</td>
+                    <td style={{ textAlign: 'right', textDecoration: 'line-through' }}>{formatIntent(email.original_intent)}</td>
+                  </tr>
                 )}
-              </div>
+              </tbody>
+            </table>
 
-              <div className="drawer-card">
-                <p className="drawer-card__label">Timeline</p>
-                <ul className="timeline">
-                  <li>
-                    <span>Received</span>
-                    <strong>{formatDateTime(email.received_at)}</strong>
-                  </li>
-                  <li>
-                    <span>Processed</span>
-                    <strong>{formatDateTime(email.processed_at)}</strong>
-                  </li>
-                </ul>
+            <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: 1.6, margin: '0 0 16px', borderTop: '0.5px solid var(--color-border-tertiary)', paddingTop: '12px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              {email.body || '(No body)'}
+            </p>
+
+            {needsReviewAction && email.prediction && email.prediction.top3 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', borderTop: '0.5px solid var(--color-border-tertiary)', paddingTop: '12px' }}>
+                <p style={{ margin: 0, fontSize: '13px', fontWeight: 500, color: 'var(--ink)' }}>Review needed</p>
+                {email.prediction.top3.filter((t: TopPrediction) => t.intent !== email.prediction!.intent).map((alt: TopPrediction) => (
+                  <button
+                    key={alt.intent}
+                    onClick={() => onReview(email.id, alt.intent)}
+                    style={{ padding: '6px 12px', fontSize: '13px', borderRadius: 'var(--border-radius-md)', border: '1px solid var(--color-border-tertiary)', background: 'var(--color-background-primary)', cursor: 'pointer', textAlign: 'left' }}
+                  >
+                    Change to {formatIntent(alt.intent)}
+                  </button>
+                ))}
+                <button
+                  onClick={() => onReview(email.id)}
+                  style={{ padding: '6px 12px', fontSize: '13px', borderRadius: 'var(--border-radius-md)', border: 'none', background: 'var(--color-text-success)', color: 'white', cursor: 'pointer', fontWeight: 500, textAlign: 'center' }}
+                >
+                  Confirm prediction
+                </button>
               </div>
-            </div>
-          </div>
+            )}
+          </>
         ) : null}
       </aside>
     </div>

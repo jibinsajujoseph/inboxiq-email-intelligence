@@ -25,18 +25,18 @@ FastAPI Backend
    |      - runs local text classification
    |      - returns top intent + top3 confidence list
    |
-   +--> RoutingService
-   |      - reads JSON routing rules
-   |      - maps intent -> department / priority / SLA
+   +--> RoutingService & ConfidenceService
+   |      - ConfidenceService flags low confidence for human review
+   |      - RoutingService maps intent -> department / priority / SLA
    |
    +--> SyncService
    |      - deduplicates by gmail_message_id
    |      - writes emails + predictions
    |
-   +--> Dashboard APIs
-          - list emails
-          - email detail
-          - stats
+   +--> DashboardService & APIs
+          - lists emails with review status filtering
+          - exposes stats with review queue counts
+          - handles PATCH updates for intent correction
 ```
 
 ## Backend Components
@@ -84,11 +84,25 @@ The model-serving path in `backend/` is backed by two notebooks that live in the
 
 This means the repo contains both sides of the system: the shipped inference app and the offline workflow used to create the classifier it serves.
 
+### `ConfidenceService`
+
+- Lives in `backend/app/services/confidence_service.py`
+- Loads `backend/app/config/confidence_config.json`
+- Evaluates classifier confidence against thresholds (`high_confidence_threshold`, `needs_review_threshold`) to assign a tier: `auto_routed`, `needs_review`, or `manual_review`.
+
 ### `RoutingService`
 
 - Lives in `backend/app/services/routing_service.py`
 - Loads `backend/app/config/routing_config.json`
 - Keeps routing policy separate from model logic
+- Re-run automatically when an intent is corrected via the review API
+
+### `DashboardService`
+
+- Lives in `backend/app/services/dashboard_service.py`
+- Orchestrates API queries with dependency injection
+- Translates `review_status` filters into threshold-based SQL queries
+- Aggregates stats including the sizes of the review queues
 
 ### `GmailService`
 

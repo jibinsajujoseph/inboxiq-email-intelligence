@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/auth/google/callback"
     ROUTING_CONFIG_PATH: Path = BASE_DIR / "backend/app/config/routing_config.json"
+    CONFIDENCE_CONFIG_PATH: Path = BASE_DIR / "backend/app/config/confidence_config.json"
     GMAIL_POLL_INTERVAL_SECONDS: int = 25
 
     model_config = SettingsConfigDict(

@@ -13,6 +13,22 @@
     'Avenir Next', 'Segoe UI Variable', 'Gill Sans', 'Trebuchet MS', sans-serif;
   --font-display:
     'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+
+  /* Semantic UI Colors */
+  --color-text-secondary: rgba(34, 25, 18, 0.64);
+  --color-text-tertiary: rgba(34, 25, 18, 0.45);
+  --color-text-success: #047857;
+  --color-background-success: #d1fae5;
+  --color-text-warning: #b45309;
+  --color-background-warning: #fef3c7;
+  --color-text-danger: #be123c;
+  --color-background-danger: #ffe4e6;
+  --color-background-secondary: rgba(255, 255, 255, 0.5);
+  --color-background-primary: #ffffff;
+  --color-border-tertiary: rgba(81, 59, 39, 0.12);
+  --border-radius-md: 0.5rem;
+  --border-radius-lg: 1rem;
+
   font-family: var(--font-sans);
   color: var(--ink);
   background:

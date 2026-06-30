@@ -92,3 +92,11 @@ def callback(request: Request, db: Session = Depends(get_db)):
     
     db.commit()
     return {"message": "Successfully connected and stored credentials."}
+
+@router.get("/status")
+def status(db: Session = Depends(get_db)):
+    """Returns the current connection status."""
+    cred = db.query(Credential).filter(Credential.status == "active").first()
+    if cred:
+        return {"connected": True, "email": cred.account_email}
+    return {"connected": False, "email": None}

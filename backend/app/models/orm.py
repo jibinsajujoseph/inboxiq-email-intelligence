@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from app.db.session import Base
 
@@ -27,6 +27,10 @@ class Prediction(Base):
     priority = Column(String)
     sla_minutes = Column(Integer)
     processed_at = Column(DateTime, default=datetime.utcnow)
+    reviewed = Column(Boolean, default=False)
+    reviewed_at = Column(DateTime, nullable=True)
+    original_intent = Column(String, nullable=True)
+    was_corrected = Column(Boolean, default=False)
 
     email = relationship("Email", back_populates="prediction")
 
