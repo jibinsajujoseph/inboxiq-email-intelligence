@@ -1,3 +1,5 @@
+import { useEffect, useEffectEvent, useRef, useState } from "react";
+
 import { type AuthStatus } from "@/services/api";
 
 export type FilterChipItem = {
@@ -27,149 +29,94 @@ export function Filters({
   onRefresh,
   onChipSelect,
 }: FiltersProps) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [isCondensed, setIsCondensed] = useState(false);
+
+  const updateCondensedState = useEffectEvent((scrollTop: number) => {
+    setIsCondensed(scrollTop > 48);
+  });
+
+  useEffect(() => {
+    const rootElement = rootRef.current;
+    const scrollContainer = rootElement?.closest(".dashboard-main");
+
+    if (!(scrollContainer instanceof HTMLElement)) {
+      return;
+    }
+
+    const handleScroll = () => {
+      updateCondensedState(scrollContainer.scrollTop);
+    };
+
+    handleScroll();
+    scrollContainer.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      scrollContainer.removeEventListener("scroll", handleScroll);
+    };
+  }, [updateCondensedState]);
+
   return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: "8px",
-          marginBottom: "1rem",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+    <div className="filters-panel">
+      <div className="filters-shell__status-row">
+        <div className="filters-shell__account">
           {authStatus?.connected ? (
             <>
-              <span style={{ fontSize: "16px", fontWeight: 500 }}>
+              <span className="filters-shell__account-email">
                 {authStatus.email ?? "Connected"}
               </span>
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  fontSize: "13px",
-                  color: "var(--color-text-secondary)",
-                }}
-              >
-                <span
-                  style={{
-                    width: "7px",
-                    height: "7px",
-                    borderRadius: "50%",
-                    background: "var(--color-text-success)",
-                    display: "inline-block",
-                  }}
-                ></span>
+              <span className="filters-shell__account-state">
+                <span className="filters-shell__status-dot filters-shell__status-dot--connected"></span>
                 Connected
               </span>
             </>
           ) : (
             <>
-              <span style={{ fontSize: "16px", fontWeight: 500 }}>
-                Not Connected
-              </span>
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  fontSize: "13px",
-                  color: "var(--color-text-secondary)",
-                }}
-              >
-                <span
-                  style={{
-                    width: "7px",
-                    height: "7px",
-                    borderRadius: "50%",
-                    background: "var(--color-text-secondary)",
-                    display: "inline-block",
-                  }}
-                ></span>
+              <span className="filters-shell__account-email">Not Connected</span>
+              <span className="filters-shell__account-state">
+                <span className="filters-shell__status-dot"></span>
                 Waiting for Gmail
               </span>
             </>
           )}
         </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            fontSize: "13px",
-            color: "var(--color-text-secondary)",
-          }}
-        >
-          <button
-            onClick={onRefresh}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-              fontSize: "13px",
-              border: "none",
-              background: "transparent",
-              cursor: "pointer",
-            }}
-          >
+        <div className="filters-shell__actions">
+          <button onClick={onRefresh} className="filters-shell__refresh">
             Sync now
           </button>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: "8px", marginBottom: "1rem" }}>
-        <div style={{ position: "relative", flex: 1 }}>
-          <input
-            type="search"
-            value={searchValue}
-            placeholder="Search sender, subject, or body"
-            onChange={(event) => onSearchChange(event.target.value)}
-            style={{
-              width: "100%",
-              paddingLeft: "1rem",
-              minHeight: "3.4rem",
-              borderRadius: "1rem",
-              border: "1px solid var(--color-border-tertiary)",
-            }}
-          />
-        </div>
-      </div>
-
       <div
-        style={{
-          display: "flex",
-          gap: "6px",
-          overflowX: "auto",
-          paddingBottom: "6px",
-          marginBottom: "1rem",
-        }}
+        ref={rootRef}
+        className={`filters-shell${isCondensed ? " is-condensed" : ""}`}
       >
-        {chips.map((chip) => {
-          const isActive = chip.key === activeChipKey;
-          return (
-            <button
-              key={chip.key}
-              onClick={() => onChipSelect(chip.key)}
-              style={{
-                border: "none",
-                background: isActive
-                  ? "var(--color-background-secondary)"
-                  : "transparent",
-                fontWeight: isActive ? 500 : 400,
-                padding: "6px 12px",
-                borderRadius: "var(--border-radius-md)",
-                fontSize: "13px",
-                whiteSpace: "nowrap",
-                cursor: "pointer",
-              }}
-            >
-              {chip.label}
-            </button>
-          );
-        })}
+        <div className="filters-shell__search-row">
+          <div className="filters-shell__search">
+            <input
+              type="search"
+              value={searchValue}
+              placeholder="Search sender, subject, or body"
+              onChange={(event) => onSearchChange(event.target.value)}
+              className="filters-shell__search-input"
+            />
+          </div>
+        </div>
+
+        <div className="filters-shell__chips">
+          {chips.map((chip) => {
+            const isActive = chip.key === activeChipKey;
+            return (
+              <button
+                key={chip.key}
+                onClick={() => onChipSelect(chip.key)}
+                className={`filters-shell__chip${isActive ? " is-active" : ""}`}
+              >
+                {chip.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

@@ -231,6 +231,186 @@
   gap: 0.75rem;
 }
 
+.filters-panel {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: grid;
+  gap: 0.65rem;
+  margin: -0.35rem -0.35rem 0;
+  padding: 0.35rem;
+}
+
+.filters-shell {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.7rem;
+  border-radius: 1.6rem;
+  border: 1px solid rgba(81, 59, 39, 0.06);
+  background: linear-gradient(180deg, rgba(244, 237, 227, 0.94), rgba(244, 237, 227, 0.82));
+  backdrop-filter: blur(16px);
+  transition:
+    gap 180ms ease,
+    padding 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.filters-shell.is-condensed {
+  gap: 0.55rem;
+  padding: 0.55rem 0.6rem 0.5rem;
+  border-color: rgba(81, 59, 39, 0.12);
+  background: linear-gradient(180deg, rgba(250, 246, 239, 0.98), rgba(242, 235, 225, 0.95));
+  box-shadow:
+    0 16px 34px rgba(66, 40, 13, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.45) inset;
+}
+
+.filters-shell__status-row,
+.filters-shell__account,
+.filters-shell__actions,
+.filters-shell__account-state,
+.filters-shell__refresh {
+  display: flex;
+  align-items: center;
+}
+
+.filters-shell__status-row {
+  padding: 0 0.25rem;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.filters-shell__account {
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.filters-shell__account-email {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: font-size 180ms ease;
+}
+
+.filters-shell__account-state,
+.filters-shell__actions,
+.filters-shell__refresh {
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
+.filters-shell__status-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.filters-shell__status-dot--connected {
+  background: var(--color-text-success);
+}
+
+.filters-shell__refresh {
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.filters-shell__search-row {
+  display: flex;
+  align-items: center;
+}
+
+.filters-shell__search {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.filters-shell__search-input {
+  display: block;
+  width: 100%;
+  padding: 0 1.1rem;
+  min-height: 3.4rem;
+  border-radius: 1rem;
+  border: 1px solid var(--color-border-tertiary);
+  background: rgba(255, 255, 255, 0.8);
+  transition:
+    min-height 180ms ease,
+    border-radius 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
+}
+
+.filters-shell__search-input:focus {
+  outline: none;
+  border-color: rgba(41, 116, 124, 0.34);
+  box-shadow: 0 0 0 3px rgba(41, 116, 124, 0.12);
+}
+
+.filters-shell__chips {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding: 0 0.1rem 0.2rem;
+  scrollbar-width: none;
+}
+
+.filters-shell__chips::-webkit-scrollbar {
+  display: none;
+}
+
+.filters-shell__chip {
+  border: none;
+  background: transparent;
+  font-weight: 400;
+  padding: 0.45rem 0.85rem;
+  border-radius: 0.85rem;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--ink);
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    padding 180ms ease,
+    transform 180ms ease;
+}
+
+.filters-shell__chip:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.filters-shell__chip.is-active {
+  background: rgba(255, 255, 255, 0.74);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(81, 59, 39, 0.06);
+}
+
+.filters-shell.is-condensed .filters-shell__search-input {
+  min-height: 2.85rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.filters-shell.is-condensed .filters-shell__chip {
+  padding: 0.38rem 0.72rem;
+}
+
 .filter-chip {
   display: inline-flex;
   align-items: center;
@@ -788,6 +968,16 @@
     padding: 1rem;
   }
 
+  .filters-shell {
+    padding: 0.62rem;
+  }
+
+  .filters-panel {
+    top: -0.15rem;
+    margin: -0.25rem -0.15rem 0;
+    padding: 0.25rem 0.15rem 0;
+  }
+
   .filters-bar,
   .section-heading,
   .email-row__header,
@@ -801,6 +991,26 @@
   .filters-bar__meta {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .filters-shell__status-row {
+    gap: 0.55rem;
+  }
+
+  .filters-shell__search-row {
+    flex-wrap: nowrap;
+  }
+
+  .filters-shell__account-email {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+
+  .filters-shell__actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 
   .stats-grid,
