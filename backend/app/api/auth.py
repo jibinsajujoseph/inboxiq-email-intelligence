@@ -1,17 +1,42 @@
-import os
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 import google_auth_oauthlib.flow
+from googleapiclient.discovery import build
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.config.settings import settings
 from app.models.orm import Credential
 from app.services.crypto_service import crypto_service
+from app.services.gmail_service import GmailService, ReauthRequiredError
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth/google", tags=["Auth"])
+gmail_service = GmailService()
 
 # Gmail API scopes required
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+
+
+def get_latest_gmail_credential(db: Session) -> Credential | None:
+    return (
+        db.query(Credential)
+        .filter(Credential.provider == "gmail")
+        .order_by(Credential.updated_at.desc())
+        .first()
+    )
+
+
+def get_active_gmail_credential(db: Session) -> Credential | None:
+    return (
+        db.query(Credential)
+        .filter(
+            Credential.provider == "gmail",
+            Credential.status == "active",
+        )
+        .order_by(Credential.updated_at.desc())
+        .first()
+    )
 
 def get_client_config():
     return {
@@ -69,16 +94,23 @@ def callback(request: Request, db: Session = Depends(get_db)):
         # If no refresh token is returned, the app needs to be re-authorized with prompt='consent'
         raise HTTPException(status_code=400, detail="No refresh token returned. Try connecting again.")
 
-    # In a real app we might get the user's email here using an additional scope, 
-    # but for a single-inbox MVP we'll just store a placeholder or try to infer it.
-    # For now, we'll store 'default_inbox' since it's a single inbox app.
-    account_email = "default_inbox"
+    account_email = None
+    try:
+        gmail_client = build("gmail", "v1", credentials=credentials, cache_discovery=False)
+        profile = gmail_client.users().getProfile(userId="me").execute()
+        account_email = profile.get("emailAddress") or account_email
+    except Exception as exc:
+        logger.warning(
+            "Unable to resolve Gmail account email from profile during callback.",
+            exc_info=exc,
+        )
 
     encrypted_token = crypto_service.encrypt(refresh_token)
 
-    # Upsert credential
-    existing_cred = db.query(Credential).filter(Credential.account_email == account_email).first()
+    # Upsert credential by provider, then keep the latest active record.
+    existing_cred = get_latest_gmail_credential(db)
     if existing_cred:
+        existing_cred.account_email = account_email
         existing_cred.encrypted_refresh_token = encrypted_token
         existing_cred.status = "active"
     else:
@@ -93,10 +125,41 @@ def callback(request: Request, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Successfully connected and stored credentials."}
 
+@router.post("/disconnect")
+def disconnect(db: Session = Depends(get_db)):
+    creds = (
+        db.query(Credential)
+        .filter(Credential.provider == "gmail", Credential.status == "active")
+        .all()
+    )
+    if not creds:
+        raise HTTPException(status_code=404, detail="No active Gmail connection found.")
+    for cred in creds:
+        cred.status = "inactive"
+    db.commit()
+    return {"disconnected": True}
+
 @router.get("/status")
 def status(db: Session = Depends(get_db)):
     """Returns the current connection status."""
-    cred = db.query(Credential).filter(Credential.status == "active").first()
+    cred = get_active_gmail_credential(db)
     if cred:
-        return {"connected": True, "email": cred.account_email}
+        try:
+            gmail_client = gmail_service.build_client(db)
+            profile = gmail_client.users().getProfile(userId="me").execute()
+            resolved_email = profile.get("emailAddress") or cred.account_email
+
+            if resolved_email != cred.account_email:
+                cred.account_email = resolved_email
+                db.commit()
+
+            return {"connected": True, "email": resolved_email}
+        except ReauthRequiredError:
+            return {"connected": False, "email": None}
+        except Exception as exc:
+            logger.warning(
+                "Unable to refresh Gmail account email from profile for auth status.",
+                exc_info=exc,
+            )
+            return {"connected": True, "email": cred.account_email}
     return {"connected": False, "email": None}

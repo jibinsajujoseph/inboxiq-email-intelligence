@@ -9,6 +9,7 @@ The runtime product is not an LLM app. In production, the intelligence layer is 
 - Connects a single Gmail inbox using a one-time Google OAuth flow
 - Stores the Gmail refresh token encrypted at rest
 - Polls Gmail every 25 seconds with APScheduler
+- Keeps the dashboard reconciled with Gmail's current `INBOX` contents, removing emails that leave the inbox
 - Classifies emails locally with `transformers.pipeline(..., top_k=3)`
 - Evaluates prediction confidence against thresholds (`confidence_config.json`) to flag emails for review
 - Maps intents to department, priority, and SLA from JSON config

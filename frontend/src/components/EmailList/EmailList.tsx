@@ -1,3 +1,4 @@
+import { formatIntentLabel } from '@/intents'
 import type { EmailListItem, PaginationMeta, TopPrediction } from '@/services/api'
 import { MouseEvent } from 'react'
 
@@ -20,13 +21,6 @@ function formatDateTime(value: string | null) {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value))
-}
-
-function formatIntent(intent: string | null) {
-  if (!intent) {
-    return 'Unclassified'
-  }
-  return intent.replaceAll('_', ' ')
 }
 
 function getConfidenceStyles(tier: string | null) {
@@ -71,6 +65,8 @@ export function EmailList({
           const selected = email.id === selectedEmailId
           const cStyle = getConfidenceStyles(email.prediction.confidence_tier)
           const needsReviewAction = !email.prediction.reviewed && (email.prediction.confidence_tier === 'needs_review' || email.prediction.confidence_tier === 'manual_review')
+          const alternatePredictions =
+            email.prediction.top3?.filter((t: TopPrediction) => t.intent !== email.prediction.intent) ?? []
           
           return (
             <button
@@ -78,59 +74,67 @@ export function EmailList({
               type="button"
               className={`email-row${selected ? ' is-selected' : ''}`}
               onClick={() => onSelectEmail(email.id)}
-              style={{ padding: '12px 14px' }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div className="email-row__header">
+                <span className="email-row__sender">
                   {email.sender || 'Unknown sender'}
                 </span>
-                <span style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                <span className="email-row__timestamp">
                   {formatDateTime(email.received_at)}
                 </span>
               </div>
 
-              <span style={{ display: 'block', fontSize: '14px', color: 'var(--color-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left', marginTop: '4px' }}>
+              <span className="email-row__subject">
                 {email.subject || '(No subject)'}
               </span>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-                <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-md)', padding: '2px 8px', whiteSpace: 'nowrap' }}>
-                  {formatIntent(email.prediction.intent)}
+              <div className="email-row__meta">
+                <span className="email-row__pill">
+                  {formatIntentLabel(email.prediction.intent)}
                 </span>
-                <span style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span className="email-row__department">
                   {email.prediction.department || 'No department'}
                 </span>
-                <span style={{ marginLeft: 'auto', fontSize: '12px', fontWeight: 500, color: cStyle.color, background: cStyle.background, padding: '2px 8px', borderRadius: 'var(--border-radius-md)', flexShrink: 0 }}>
+                <span
+                  className="email-row__confidence"
+                  style={{ color: cStyle.color, background: cStyle.background }}
+                >
                   {email.prediction.confidence !== null ? `${Math.round(email.prediction.confidence * 100)}%` : 'N/A'}
                 </span>
               </div>
 
-              {needsReviewAction && email.prediction.top3 && email.prediction.top3.length > 0 && (
-                <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '0.5px solid var(--color-border-tertiary)', display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <span style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', marginRight: '4px' }}>Correct to:</span>
-                  {email.prediction.top3.filter((t: TopPrediction) => t.intent !== email.prediction.intent).map((alt: TopPrediction) => (
+              <div className="email-row__footer">
+                {needsReviewAction && alternatePredictions.length > 0 ? (
+                  <>
+                    <span className="email-row__footer-note">Correct to:</span>
+                    {alternatePredictions.map((alt: TopPrediction) => (
+                      <button
+                        key={alt.intent}
+                        onClick={(e: MouseEvent) => {
+                          e.stopPropagation()
+                          onReview(email.id, alt.intent)
+                        }}
+                        className="email-row__action"
+                      >
+                        {formatIntentLabel(alt.intent)}
+                      </button>
+                    ))}
                     <button
-                      key={alt.intent}
                       onClick={(e: MouseEvent) => {
                         e.stopPropagation()
-                        onReview(email.id, alt.intent)
+                        onReview(email.id)
                       }}
-                      style={{ fontSize: '12px', padding: '3px 8px', borderRadius: 'var(--border-radius-md)', border: '1px solid var(--color-border-tertiary)', background: 'var(--color-background-primary)', cursor: 'pointer' }}
+                      className="email-row__confirm"
                     >
-                      {formatIntent(alt.intent)}
+                      Confirm original
                     </button>
-                  ))}
-                  <button
-                    onClick={(e: MouseEvent) => {
-                      e.stopPropagation()
-                      onReview(email.id)
-                    }}
-                    style={{ marginLeft: 'auto', fontSize: '12px', padding: '3px 10px', borderRadius: 'var(--border-radius-md)', border: 'none', background: 'var(--color-text-success)', color: 'white', cursor: 'pointer', fontWeight: 500 }}
-                  >
-                    Confirm original
-                  </button>
-                </div>
-              )}
+                  </>
+                ) : (
+                  <span className="email-row__footer-note">
+                    {email.prediction.reviewed ? 'Reviewed and confirmed' : 'Open the message to inspect full routing details'}
+                  </span>
+                )}
+              </div>
             </button>
           )
         })}

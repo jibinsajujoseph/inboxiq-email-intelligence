@@ -1,3 +1,6 @@
+import { useEffect, useState } from 'react'
+
+import { OUT_OF_SCOPE_INTENT, SUPPORTED_INTENT_OPTIONS, formatIntentLabel } from '@/intents'
 import type { EmailDetail, TopPrediction } from '@/services/api'
 
 type EmailDetailDrawerProps = {
@@ -19,10 +22,6 @@ function formatDateTime(value: string | null) {
   }).format(new Date(value))
 }
 
-function formatIntent(intent: string) {
-  return intent.replaceAll('_', ' ')
-}
-
 function getConfidenceStyles(tier: string | null) {
   if (tier === 'auto_routed') return { color: 'var(--color-text-success)', background: 'var(--color-background-success)' }
   if (tier === 'needs_review') return { color: 'var(--color-text-warning)', background: 'var(--color-background-warning)' }
@@ -37,15 +36,33 @@ export function EmailDetailDrawer({
   onClose,
   onReview
 }: EmailDetailDrawerProps) {
+  const [isIntentPickerOpen, setIsIntentPickerOpen] = useState(false)
+  const [selectedIntent, setSelectedIntent] = useState<string | null>(null)
   const cStyle = email ? getConfidenceStyles(email.confidence_tier) : null
   const needsReviewAction = email && !email.reviewed && (email.confidence_tier === 'needs_review' || email.confidence_tier === 'manual_review')
+  const fullIntentOptions = SUPPORTED_INTENT_OPTIONS.filter((option) => option.value !== email?.prediction?.intent)
+  const alternatePredictions =
+    email?.prediction?.top3?.filter((t: TopPrediction) => t.intent !== email.prediction!.intent) ?? []
+  const bodyLines = email?.body
+    ? email.body
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+    : []
+
+  useEffect(() => {
+    setIsIntentPickerOpen(false)
+    setSelectedIntent(fullIntentOptions[0]?.value ?? null)
+  }, [email?.id, email?.prediction?.intent])
+
+  const selectedReviewIntent = selectedIntent ?? fullIntentOptions[0]?.value ?? null
 
   return (
     <div className={`drawer-shell${isOpen ? ' is-open' : ''}`} aria-hidden={!isOpen}>
       <aside className="drawer" aria-label="Email details">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-          <span style={{ fontSize: '15px', fontWeight: 500, color: 'var(--ink)' }}>{email?.subject || 'Select an email'}</span>
-          <button aria-label="Close detail" onClick={onClose} style={{ border: 'none', padding: '2px', width: 'auto', flexShrink: 0, background: 'transparent', cursor: 'pointer', fontSize: '16px', color: 'var(--color-text-tertiary)' }}>
+        <div className="drawer__header">
+          <h2>{email?.subject || 'Select an email'}</h2>
+          <button aria-label="Close detail" className="drawer__close" onClick={onClose} type="button">
             ✕
           </button>
         </div>
@@ -57,76 +74,145 @@ export function EmailDetailDrawer({
         ) : null}
 
         {email ? (
-          <>
-            <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: '0 0 12px' }}>
-              {email.sender || 'Unknown sender'}
-            </p>
+          <div className="drawer__content">
+            <p className="drawer__sender">{email.sender || 'Unknown sender'}</p>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+            <div className="drawer__chips">
               {email.prediction && (
-                <span style={{ fontSize: '12px', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-md)', padding: '3px 8px' }}>
-                  {formatIntent(email.prediction.intent)}
+                <span className="drawer__chip">
+                  {formatIntentLabel(email.prediction.intent)}
                 </span>
               )}
-              <span style={{ fontSize: '12px', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-md)', padding: '3px 8px' }}>
+              <span className="drawer__chip">
                 {email.department || 'Unassigned'}
               </span>
               {email.prediction && cStyle && (
-                <span style={{ fontSize: '12px', fontWeight: 500, color: cStyle.color, background: cStyle.background, padding: '3px 8px', borderRadius: 'var(--border-radius-md)' }}>
+                <span className="drawer__chip drawer__chip--confidence" style={{ color: cStyle.color, background: cStyle.background }}>
                   {Math.round(email.prediction.confidence * 100)}%
                 </span>
               )}
               {email.reviewed && (
-                <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-success)', background: 'var(--color-background-success)', padding: '3px 8px', borderRadius: 'var(--border-radius-md)' }}>
+                <span className="drawer__chip drawer__chip--confidence" style={{ color: 'var(--color-text-success)', background: 'var(--color-background-success)' }}>
                   Reviewed
                 </span>
               )}
             </div>
 
-            <table style={{ width: '100%', fontSize: '13px', marginBottom: '12px' }}>
-              <tbody>
-                <tr>
-                  <td style={{ color: 'var(--color-text-secondary)', padding: '3px 0' }}>Priority</td>
-                  <td style={{ textAlign: 'right' }}>{email.priority || 'Not set'}</td>
-                </tr>
-                <tr>
-                  <td style={{ color: 'var(--color-text-secondary)', padding: '3px 0' }}>SLA</td>
-                  <td style={{ textAlign: 'right' }}>{email.sla_minutes !== null ? `${email.sla_minutes} min` : 'Not set'}</td>
-                </tr>
-                {email.was_corrected && email.original_intent && (
-                  <tr>
-                    <td style={{ color: 'var(--color-text-secondary)', padding: '3px 0' }}>Original Intent</td>
-                    <td style={{ textAlign: 'right', textDecoration: 'line-through' }}>{formatIntent(email.original_intent)}</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+            <dl className="drawer__facts-list">
+              <div className="drawer__fact-row">
+                <dt>Priority</dt>
+                <dd>{email.priority || 'Not set'}</dd>
+              </div>
+              <div className="drawer__fact-row">
+                <dt>SLA</dt>
+                <dd>{email.sla_minutes !== null ? `${email.sla_minutes} min` : 'Not set'}</dd>
+              </div>
+              <div className="drawer__fact-row">
+                <dt>Received</dt>
+                <dd>{formatDateTime(email.received_at)}</dd>
+              </div>
+              {email.processed_at ? (
+                <div className="drawer__fact-row">
+                  <dt>Processed</dt>
+                  <dd>{formatDateTime(email.processed_at)}</dd>
+                </div>
+              ) : null}
+              {email.was_corrected && email.original_intent ? (
+                <div className="drawer__fact-row">
+                  <dt>Original intent</dt>
+                  <dd className="drawer__fact-value--muted">{formatIntentLabel(email.original_intent)}</dd>
+                </div>
+              ) : null}
+            </dl>
 
-            <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: 1.6, margin: '0 0 16px', borderTop: '0.5px solid var(--color-border-tertiary)', paddingTop: '12px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-              {email.body || '(No body)'}
-            </p>
+            <div className="drawer__message">
+              {bodyLines.length > 0 ? (
+                <div className="drawer__message-content">
+                  {bodyLines.map((line, index) => {
+                    const isImageToken = /^\[image:.*\]$/i.test(line)
+                    return (
+                      <p key={`${index}-${line.slice(0, 16)}`} className={isImageToken ? 'drawer__message-token' : undefined}>
+                        {line}
+                      </p>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="drawer__message-empty">(No body)</p>
+              )}
+            </div>
 
             {needsReviewAction && email.prediction && email.prediction.top3 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', borderTop: '0.5px solid var(--color-border-tertiary)', paddingTop: '12px' }}>
-                <p style={{ margin: 0, fontSize: '13px', fontWeight: 500, color: 'var(--ink)' }}>Review needed</p>
-                {email.prediction.top3.filter((t: TopPrediction) => t.intent !== email.prediction!.intent).map((alt: TopPrediction) => (
+              <div className="drawer__review">
+                <p className="drawer__review-title">Review needed</p>
+                {alternatePredictions.map((alt: TopPrediction) => (
                   <button
                     key={alt.intent}
                     onClick={() => onReview(email.id, alt.intent)}
-                    style={{ padding: '6px 12px', fontSize: '13px', borderRadius: 'var(--border-radius-md)', border: '1px solid var(--color-border-tertiary)', background: 'var(--color-background-primary)', cursor: 'pointer', textAlign: 'left' }}
+                    className="drawer__review-action"
+                    type="button"
                   >
-                    Change to {formatIntent(alt.intent)}
+                    Change to {formatIntentLabel(alt.intent)}
                   </button>
                 ))}
+                {fullIntentOptions.length > 0 ? (
+                  <>
+                    <button
+                      onClick={() => setIsIntentPickerOpen((current) => !current)}
+                      className="drawer__review-action drawer__review-action--secondary"
+                      type="button"
+                    >
+                      {isIntentPickerOpen ? 'Hide full intent list' : 'Choose another supported intent'}
+                    </button>
+                    {isIntentPickerOpen ? (
+                      <div className="drawer__review-picker">
+                        <label className="drawer__review-label" htmlFor="review-intent-select">
+                          All supported intents
+                        </label>
+                        <select
+                          id="review-intent-select"
+                          className="drawer__review-select"
+                          value={selectedReviewIntent ?? ''}
+                          onChange={(event) => setSelectedIntent(event.target.value)}
+                        >
+                          {fullIntentOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => selectedReviewIntent && onReview(email.id, selectedReviewIntent)}
+                          className="drawer__review-action drawer__review-action--primary"
+                          type="button"
+                          disabled={!selectedReviewIntent}
+                        >
+                          Apply selected intent
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
+                <button
+                  onClick={() => onReview(email.id, OUT_OF_SCOPE_INTENT)}
+                  className="drawer__review-action drawer__review-action--secondary"
+                  type="button"
+                >
+                  Mark as Other / out of scope
+                </button>
+                <p className="drawer__review-note">
+                  Use this when the email does not match any of the supported product-support intents.
+                </p>
                 <button
                   onClick={() => onReview(email.id)}
-                  style={{ padding: '6px 12px', fontSize: '13px', borderRadius: 'var(--border-radius-md)', border: 'none', background: 'var(--color-text-success)', color: 'white', cursor: 'pointer', fontWeight: 500, textAlign: 'center' }}
+                  className="drawer__review-confirm"
+                  type="button"
                 >
                   Confirm prediction
                 </button>
               </div>
             )}
-          </>
+          </div>
         ) : null}
       </aside>
     </div>

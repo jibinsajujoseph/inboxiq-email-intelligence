@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ClassifyRequest(BaseModel):
@@ -88,6 +88,7 @@ class CountByLabel(BaseModel):
 
 
 VALID_REVIEW_STATUSES = {"needs_review", "manual_review", "unreviewed", "reviewed", "all"}
+OUT_OF_SCOPE_INTENT = "other_out_of_scope"
 
 
 class StatsResponse(BaseModel):
@@ -113,6 +114,15 @@ class EmailFilters(BaseModel):
 
 class ReviewRequest(BaseModel):
     corrected_intent: str | None = None
+
+    @field_validator("corrected_intent", mode="before")
+    @classmethod
+    def normalize_corrected_intent(cls, value: str | None) -> str | None:
+        if not isinstance(value, str):
+            return value
+
+        normalized = value.strip()
+        return normalized or None
 
 
 class ReviewResponse(BaseModel):

@@ -45,10 +45,10 @@ class GmailService:
         google_credentials = self._refresh_google_credentials(db)
         return build("gmail", "v1", credentials=google_credentials, cache_discovery=False)
 
-    def list_message_ids_since(
+    def list_inbox_message_ids(
         self,
         service: Resource,
-        received_after: datetime | None,
+        received_after: datetime | None = None,
     ) -> list[str]:
         query = self._build_query(received_after)
 
@@ -60,6 +60,7 @@ class GmailService:
                 .messages()
                 .list(
                     userId="me",
+                    labelIds=["INBOX"],
                     q=query or None,
                     pageToken=page_token,
                     maxResults=100,

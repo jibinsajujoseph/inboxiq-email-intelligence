@@ -14,7 +14,13 @@ class Email(Base):
     received_at = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    prediction = relationship("Prediction", back_populates="email", uselist=False)
+    prediction = relationship(
+        "Prediction",
+        back_populates="email",
+        uselist=False,
+        cascade="all, delete-orphan",
+        single_parent=True,
+    )
 
 class Prediction(Base):
     __tablename__ = "predictions"

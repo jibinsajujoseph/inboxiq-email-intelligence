@@ -39,18 +39,24 @@ class SyncService:
                     return
 
                 gmail_client = self.gmail_service.build_client(db)
-                last_received_at = self._get_last_received_at(db)
-                message_ids = self.gmail_service.list_message_ids_since(gmail_client, last_received_at)
-                if not message_ids:
-                    logger.debug("No Gmail messages found for the current sync window.")
+                inbox_message_ids = self.gmail_service.list_inbox_message_ids(gmail_client)
+                removed_count = self._prune_removed_emails(db, inbox_message_ids)
+                if removed_count:
+                    logger.info(
+                        "Removed %s email(s) that are no longer present in the Gmail inbox.",
+                        removed_count,
+                    )
+
+                if not inbox_message_ids:
+                    logger.debug("No Gmail inbox messages found during reconciliation.")
                     return
 
-                existing_ids = self._get_existing_message_ids(db, message_ids)
+                existing_ids = self._get_existing_message_ids(db, inbox_message_ids)
                 new_message_ids = [
-                    message_id for message_id in message_ids if message_id not in existing_ids
+                    message_id for message_id in inbox_message_ids if message_id not in existing_ids
                 ]
                 if not new_message_ids:
-                    logger.debug("All fetched Gmail messages were already stored locally.")
+                    logger.debug("Local InboxIQ store is already aligned with the Gmail inbox.")
                     return
 
                 logger.info("Processing %s new Gmail message(s).", len(new_message_ids))
@@ -63,10 +69,6 @@ class SyncService:
             except Exception:
                 logger.exception("Unexpected error during Gmail sync.")
 
-    def _get_last_received_at(self, db: Session) -> datetime | None:
-        latest_email = db.query(Email).order_by(Email.received_at.desc()).first()
-        return latest_email.received_at if latest_email else None
-
     def _get_existing_message_ids(self, db: Session, message_ids: list[str]) -> set[str]:
         if not message_ids:
             return set()
@@ -77,6 +79,21 @@ class SyncService:
             .all()
         )
         return {row[0] for row in rows}
+
+    def _prune_removed_emails(self, db: Session, inbox_message_ids: list[str]) -> int:
+        stale_query = db.query(Email).filter(Email.gmail_message_id.isnot(None))
+        if inbox_message_ids:
+            stale_query = stale_query.filter(~Email.gmail_message_id.in_(inbox_message_ids))
+
+        stale_emails = stale_query.all()
+        if not stale_emails:
+            return 0
+
+        for email in stale_emails:
+            db.delete(email)
+
+        db.commit()
+        return len(stale_emails)
 
     def _process_message(self, db: Session, gmail_client, message_id: str) -> None:
         try:

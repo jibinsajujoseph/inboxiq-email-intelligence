@@ -13,9 +13,9 @@ from app.models.schemas import (
     EmailListItem,
     EmailListResponse,
     EmailPredictionSummary,
+    OUT_OF_SCOPE_INTENT,
     PaginationMeta,
     ReviewRequest,
-    ReviewResponse,
     StatsResponse,
     TopPrediction,
 )
@@ -25,6 +25,12 @@ from app.services.routing_service import RoutingService
 
 class DashboardService:
     """Provides filtered email retrieval, dashboard aggregates, and review actions."""
+
+    FALLBACK_REVIEW_ROUTE = {
+        "department": "Manual Triage",
+        "priority": "Needs Review",
+        "sla_minutes": None,
+    }
 
     def __init__(
         self,
@@ -139,7 +145,7 @@ class DashboardService:
 
     def review_email(
         self, db: Session, email_id: int, review: ReviewRequest
-    ) -> ReviewResponse | None:
+    ) -> EmailDetailResponse | None:
         """Mark a prediction as reviewed, optionally correcting the intent."""
         email = (
             db.query(Email)
@@ -162,7 +168,7 @@ class DashboardService:
             prediction.was_corrected = True
 
             # Re-run routing to update department/priority/SLA
-            routing_result = self.routing_service.route(review.corrected_intent)
+            routing_result = self._resolve_review_route(review.corrected_intent)
             prediction.department = routing_result["department"]
             prediction.priority = routing_result["priority"]
             prediction.sla_minutes = routing_result["sla_minutes"]
@@ -175,22 +181,7 @@ class DashboardService:
         db.refresh(prediction)
         db.refresh(email)
 
-        return ReviewResponse(
-            id=email.id,
-            gmail_message_id=email.gmail_message_id,
-            sender=email.sender,
-            subject=email.subject,
-            intent=prediction.intent,
-            confidence=prediction.confidence,
-            confidence_tier=self.confidence_service.get_tier(prediction.confidence),
-            department=prediction.department,
-            priority=prediction.priority,
-            sla_minutes=prediction.sla_minutes,
-            reviewed=prediction.reviewed,
-            reviewed_at=prediction.reviewed_at,
-            original_intent=prediction.original_intent,
-            was_corrected=prediction.was_corrected,
-        )
+        return self.get_email_detail(db, email.id)
 
     def get_stats(self, db: Session) -> StatsResponse:
         total_emails = db.query(func.count(Email.id)).scalar() or 0
@@ -278,6 +269,15 @@ class DashboardService:
             query = self._apply_review_status_filter(query, filters.review_status)
 
         return query
+
+    def _resolve_review_route(self, intent: str) -> dict[str, str | int | None]:
+        if intent == OUT_OF_SCOPE_INTENT:
+            return dict(self.FALLBACK_REVIEW_ROUTE)
+
+        try:
+            return self.routing_service.route(intent)
+        except ValueError:
+            return dict(self.FALLBACK_REVIEW_ROUTE)
 
     def _apply_review_status_filter(self, query, review_status: str):
         """Translate a review_status value into confidence-range + reviewed SQL filters."""

@@ -17,7 +17,7 @@ FastAPI Backend
    |
    +--> GmailService
    |      - refreshes Google access tokens in memory
-   |      - lists and fetches Gmail messages
+   |      - lists and fetches Gmail inbox messages
    |      - parses headers and MIME bodies
    |
    +--> ClassifierService
@@ -30,7 +30,7 @@ FastAPI Backend
    |      - RoutingService maps intent -> department / priority / SLA
    |
    +--> SyncService
-   |      - deduplicates by gmail_message_id
+   |      - reconciles the local store against the current Gmail inbox
    |      - writes emails + predictions
    |
    +--> DashboardService & APIs
@@ -121,13 +121,16 @@ If Google returns `invalid_grant`, the credential status is updated to `needs_re
 
 - Lives in `backend/app/services/sync_service.py`
 - Runs inside an APScheduler interval job
-- Uses a small overlap window when querying Gmail, then deduplicates by `gmail_message_id`
+- Reconciles the local database against Gmail's current `INBOX` label
 - For each new message:
   1. Parse the Gmail payload
   2. Store the email
   3. Classify `Subject + Body`
   4. Enrich with routing data
   5. Store the prediction
+- For each removed or archived inbox message:
+  1. Detect that it is no longer under Gmail's `INBOX` label
+  2. Remove the local email and prediction row so the dashboard stays in sync
 
 ## Persistence
 

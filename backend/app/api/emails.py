@@ -7,7 +7,6 @@ from app.models.schemas import (
     EmailFilters,
     EmailListResponse,
     ReviewRequest,
-    ReviewResponse,
     VALID_REVIEW_STATUSES,
 )
 from app.services.dashboard_service import DashboardService
@@ -64,13 +63,13 @@ def get_email(
     return email
 
 
-@router.patch("/{email_id}/review", response_model=ReviewResponse)
+@router.patch("/{email_id}/review", response_model=EmailDetailResponse)
 def review_email(
     email_id: int,
     review: ReviewRequest | None = None,
     db: Session = Depends(get_db),
     dashboard_service: DashboardService = Depends(get_dashboard_service),
-) -> ReviewResponse:
+) -> EmailDetailResponse:
     if review is None:
         review = ReviewRequest()
 
